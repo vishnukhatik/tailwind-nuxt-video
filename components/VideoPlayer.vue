@@ -213,7 +213,7 @@
             </div>
             <!-- video voice control end -->
             <!-- video setting control start -->
-            <button class="kidoo-contrl-play-btn" @click="settingMenu = !settingMenu">
+            <button class="kidoo-contrl-play-btn" @click="toggleSettingIcon()">
               <svg
                 class="kidoo-contrl-vol-btn-icon"
                 xmlns="http://www.w3.org/2000/svg"
@@ -254,14 +254,21 @@
             </button>
             <!-- video full screen control end -->
             <div class="kidoo-contrl-setting absolute px-2 py-2 bg-[#000000b8]"  transition="fade" v-show="settingMenu">
-              <div class="flex justify-between px-2 py-2 text-sm text-white">
-                <span>Playback Speed</span>
-                <span>Normal ></span>
+              <div class="flex justify-between px-2 py-2 text-sm text-white hover:bg-[#624b4bb8] cursor-pointer rounded" @click="playbackSetting = !playbackSetting; settingMenu = false">
+                <span class="font-bold text-white">Playback Speed</span>
+                <span>{{ currentPlaybackRate }}</span>
               </div>
-              <div class="flex justify-between px-2 py-2 text-sm text-white">
-                <span>Quality</span>
-                <span>720p ></span>
+              <div class="flex justify-between px-2 py-2 text-sm text-white hover:bg-[#624b4bb8] cursor-pointer rounded">
+                <span class="font-bold text-white">Quality</span>
+                <span>720p</span>
               </div>
+            </div>
+            <div class="kidoo-contrl-setting kidoo-contrl-setting-playbackspeed absolute px-2 py-2 bg-[#000000b8]"  transition="fade" v-show="playbackSetting">
+              <div class="h-52 overflow-auto">
+              <div v-for="playback in playBackSpeed" :key="playback.value" @click="changePlaybackSpeed(playback.value)" :class="activePlaySpeedRate(playback.value)" class="flex justify-between px-2 py-2 text-sm text-white hover:bg-[#624b4bb8] cursor-pointer rounded">
+                <span>{{  playback.title  }}</span>
+              </div>
+            </div>
             </div>
           </div>
         </div>
@@ -305,9 +312,9 @@ export default {
   },
   data() {
     return {
-      $video: null,
+      videoData: null,
       video: {
-        $videoSlider: null,
+        videoDataSlider: null,
         len: 0,
         current: 0,
         loaded: 0,
@@ -346,9 +353,42 @@ export default {
         currentTime: 0,
         fullScreen: false,
         playing: true,
+        playBackRate: 1.0,
       },
       settingMenu: false,
+      playbackSetting: false,
+      playBackSpeed: [
+        {
+          title: '0.5x',
+          value: 0.5
+        },
+        {
+          title: '0.75x',
+          value: 0.75
+        },
+        {
+          title: '1.0x',
+          value: 1.0
+        },
+        {
+          title: '1.25x',
+          value: 1.25
+        },
+        {
+          title: '1.5x',
+          value: 1.5
+        },
+        {
+          title: '1.75x',
+          value: 1.75
+        },
+      ]
     };
+  },
+  computed: {
+    currentPlaybackRate() {
+      return this.playBackSpeed.find((speed) => speed.value === this.state.playBackRate).title
+    }
   },
   ready() {
     this.init();
@@ -362,13 +402,33 @@ export default {
   },
   methods: {
     init() {
-      this.$video = this.$el.getElementsByTagName("video")[0];
+      this.videoData = this.$el.getElementsByTagName("video")[0];
       this.initCore();
       if (this.options.autoplay) {
         this.play();
       }
       document.body.addEventListener("mousemove", this.mouseMoveAction, false);
       document.body.addEventListener("mouseup", this.mouseUpAction, false);
+      document.onkeydown = (event) => {
+        console.log('event.keyCode', event.keyCode);
+      switch (event.keyCode) {
+       case 32:
+            event.preventDefault();
+            this.play();
+          break;
+       case 39:
+            event.preventDefault();
+            this.videoData.currentTime += 10;
+            console.log('this.videoData.currentTime', this.videoData.currentTime);
+       case 37:
+       event.preventDefault();
+            this.videoData.currentTime -= 10;
+            console.log('this.videoData.currentTime', this.videoData.currentTime);
+       
+    }
+};
+      this.videoData.playbackRate = parseFloat(1.0)
+      this.state.playBackRate =  this.videoData.playbackRate
     },
     initCore() {
       this.initVol();
@@ -396,17 +456,17 @@ export default {
         $volBox.getBoundingClientRect().width - this.volume.pos.innerWidth;
     },
     initVideo() {
-      const $videoSlider = this.$el.getElementsByClassName(
+      const videoDataSlider = this.$el.getElementsByClassName(
         "kidoo-contrl-video-slider"
       )[0];
-      const $videoInner = $videoSlider.getElementsByClassName(
+      const videoDataInner = videoDataSlider.getElementsByClassName(
         "kidoo-contrl-video-inner"
       )[0];
-      this.$videoSlider = $videoSlider;
-      this.video.pos.start = $videoSlider.getBoundingClientRect().left;
-      this.video.pos.innerWidth = $videoInner.getBoundingClientRect().width;
+      this.videoDataSlider = videoDataSlider;
+      this.video.pos.start = videoDataSlider.getBoundingClientRect().left;
+      this.video.pos.innerWidth = videoDataInner.getBoundingClientRect().width;
       this.video.pos.width =
-        $videoSlider.getBoundingClientRect().width - this.video.pos.innerWidth;
+        videoDataSlider.getBoundingClientRect().width - this.video.pos.innerWidth;
       this.getTime();
     },
     mouseEnterVideo() {
@@ -428,43 +488,48 @@ export default {
     toggleContrlShow() {
       this.state.contrlShow = !this.state.contrlShow;
     },
+    toggleSettingIcon() {
+      this.settingMenu = !this.settingMenu;
+      if(this.settingMenu) this.playbackSetting = false
+    },
     getTime() {
-      this.$video.addEventListener("durationchange", (e) => {
+      this.videoData.addEventListener("durationchange", (e) => {
         console.log(e);
       });
-      this.$video.addEventListener("progress", (e) => {
+      this.videoData.addEventListener("progress", (e) => {
         this.video.loaded =
-          (-1 + this.$video.buffered.end(0) / this.$video.duration) * 100;
+          (-1 + this.videoData.buffered.end(0) / this.videoData.duration) * 100;
       });
-      this.video.len = this.$video.duration;
+      this.video.len = this.videoData.duration;
     },
     setVideoByTime(percent) {
-      this.$video.currentTime = Math.floor(percent * this.video.len);
+      this.videoData.currentTime = Math.floor(percent * this.video.len);
     },
     play() {
       this.state.playing = !this.state.playing;
-      if (this.$video) {
+      if (this.videoData) {
         if (this.state.playing) {
-          this.$video.play();
+          this.videoData.play();
           this.mouseLeaveVideo();
-          this.$video.addEventListener("timeupdate", this.timeline);
-          this.$video.addEventListener("ended", (e) => {
+          this.videoData.addEventListener("timeupdate", this.timeline);
+          this.videoData.addEventListener("ended", (e) => {
             this.state.playing = false;
             this.video.pos.current = 0;
-            this.$video.currentTime = 0;
+            this.videoData.currentTime = 0;
           });
         } else {
-          this.$video.pause();
+          this.videoData.pause();
         }
       }
     },
     timeline() {
-      const percent = this.$video.currentTime / this.$video.duration;
+      console.log('timeline update');
+      const percent = this.videoData.currentTime / this.videoData.duration;
       this.video.pos.current = (this.video.pos.width * percent).toFixed(3);
       this.video.displayTime = timeParse(
-        this.$video.duration - this.$video.currentTime
+        this.videoData.duration - this.videoData.currentTime
       );
-      this.video.currentTime = timeParse(this.$video.currentTime);
+      this.video.currentTime = timeParse(this.videoData.currentTime);
     },
     volMove(e) {
       this.initVol();
@@ -481,20 +546,20 @@ export default {
       this.volSlideMove(e);
     },
     volMuted() {
-      this.$video.muted = !this.$video.muted;
-      this.volume.muted = this.$video.muted;
+      this.videoData.muted = !this.videoData.muted;
+      this.volume.muted = this.videoData.muted;
     },
     setVol(val) {
-      if (this.$video) {
+      if (this.videoData) {
         this.volume.pos.current = val * this.volume.pos.width;
         this.volume.percent = val * 100;
-        this.$video.volume = val;
+        this.videoData.volume = val;
       }
     },
     fullScreen() {
       if (!this.state.fullScreen) {
         this.state.fullScreen = true;
-        this.$video.webkitRequestFullScreen();
+        this.videoData.webkitRequestFullScreen();
       } else {
         this.state.fullScreen = false;
         document.webkitCancelFullScreen();
@@ -544,6 +609,18 @@ export default {
       this.volume.moving = false;
       this.video.moving = false;
     },
+    activePlaySpeedRate(rate) {
+      return  this.state.playBackRate == rate ? 'bg-[#624b4bb8]' : ''
+    },
+    changePlaybackSpeed(rate) {
+      this.videoData.playbackRate = parseFloat(rate)
+      this.state.playBackRate =  this.videoData.playbackRate
+      if(this.playbackSetting)
+      {
+        this.playbackSetting = false
+        this.settingMenu = true
+      }
+    }
   },
 };
 </script>
@@ -699,6 +776,10 @@ video::-webkit-media-controls-enclosure {
   margin-right: 0.4rem;
   width: 13rem;
 }
+.kidoo-contrl-setting-playbackspeed {
+  margin-top: -16rem !important;
+}
+
 
 @media all and (max-width: 768px) {
   .kidoo-contrl-vol-slider {
